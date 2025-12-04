@@ -3,10 +3,13 @@ import jwt
 import requests
 from app.core.config import settings
 
+
 def get_jwt():
     """Generates a JWT for the GitHub App."""
-    with open(settings.PRIVATE_KEY_PATH, 'r') as f:
-        private_key = f.read()
+    private_key = settings.private_key_content
+    
+    if not private_key:
+        raise ValueError("No private key configured. Set PRIVATE_KEY or PRIVATE_KEY_PATH.")
     
     payload = {
         'iat': int(time.time()),
