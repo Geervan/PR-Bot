@@ -3,7 +3,7 @@ from app.core.key_manager import key_manager
 
 class GeminiClient:
     def __init__(self):
-        self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+        self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
     async def generate_content(self, prompt: str) -> str:
         """Generates content using Gemini REST API with key rotation."""
