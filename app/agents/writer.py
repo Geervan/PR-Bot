@@ -62,16 +62,17 @@ Write a review with these sections:
 1. **Summary**: One sentence overview
 2. **Key Changes**: Bullet points of significant changes
 3. **Security Alerts**: If any security issues were found, highlight them prominently with ⚠️
-4. **Concerns**: Any bugs, security issues, or code quality problems (if none, say "None identified")
-5. **Suggestions**: Actionable improvements (if any)
+4. **Concerns**: Only mention actual bugs, security issues, or breaking changes (if none, say "None identified")
+5. **Suggestions**: Only suggest fixes for real problems
 
 Rules:
 - Be concise and specific
-- No fluff or pleasantries
-- Use markdown formatting
-- PRIORITIZE security issues - they should be the first thing mentioned if found
-- If the RAG context shows related code, consider whether the changes are consistent with existing patterns
-- If everything looks good, say so briefly"""
+- Focus ONLY on: bugs, security issues, breaking changes, missing error handling
+- DO NOT comment on: code style, variable naming, formatting, comments, personal preferences
+- Everyone has their own coding style - respect it
+- PRIORITIZE security issues
+- If no real issues found, just say "Looks good! No issues found."
+- Keep it short - developers are busy"""
         
         try:
             review = await llm_client.generate_content(prompt)
