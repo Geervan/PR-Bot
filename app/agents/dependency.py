@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Set
 from app.agents.base import BaseAgent
 from github import Github
 from app.core.security import get_installation_access_token
-from app.core.code_parser import python_parser, CodeSymbols
+from app.core.code_parser import code_parser, CodeSymbols
 
 
 class DependencyAgent(BaseAgent):
@@ -37,7 +37,8 @@ class DependencyAgent(BaseAgent):
         for file_info in files_changed:
             filename = file_info['filename']
             
-            if not filename.endswith('.py'):
+            # Skip unsupported files
+            if not code_parser.is_supported(filename):
                 continue
             
             # Fetch full file content from the repo
@@ -47,8 +48,8 @@ class DependencyAgent(BaseAgent):
                 print(f"DependencyAgent: Could not fetch {filename}: {e}")
                 continue
             
-            # Parse with Tree-sitter
-            symbols = python_parser.parse(file_content)
+            # Parse with Tree-sitter (multi-language)
+            symbols = code_parser.parse(file_content, filename)
             
             # Collect defined symbols
             all_defined_functions.update(symbols.functions)
@@ -60,7 +61,7 @@ class DependencyAgent(BaseAgent):
                 all_imports.add(fi['module'])
             
             # Generate compact summary for LLM
-            file_summaries[filename] = python_parser.get_summary(file_content)
+            file_summaries[filename] = code_parser.get_summary(file_content, filename)
         
         # Find files that might be affected (reverse dependency lookup)
         # Search for files that import or call the modified functions/classes
