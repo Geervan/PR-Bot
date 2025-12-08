@@ -59,24 +59,43 @@ class ReviewWriterAgent(BaseAgent):
 ---
 
 Write a review with these sections:
-1. **Summary**: One sentence overview
+1. **What This PR Does**: Describe the functionality being added/changed (always include this!)
 2. **Key Changes**: Bullet points of significant changes
 3. **Security Alerts**: If any security issues were found, highlight them prominently with ⚠️
 4. **Concerns**: Only mention actual bugs, security issues, or breaking changes (if none, say "None identified")
-5. **Suggestions**: Only suggest fixes for real problems
+5. **Suggestions**: Only suggest fixes for real problems (if none needed, skip this section)
 
 Rules:
-- Be concise and specific
+- ALWAYS describe what the code does functionally, even if it has issues
 - Focus ONLY on: bugs, security issues, breaking changes, missing error handling
 - DO NOT comment on: code style, variable naming, formatting, comments, personal preferences
 - Everyone has their own coding style - respect it
-- PRIORITIZE security issues
-- If no real issues found, just say "Looks good! No issues found."
+- PRIORITIZE security issues but still explain what the code is trying to do
 - Keep it short - developers are busy"""
         
         try:
             review = await llm_client.generate_content(prompt)
-            return review
+            
+            # Add risk score badge at the top
+            risk_score = risk_data.get('score', 0)
+            risk_level = risk_data.get('level', 'Low')
+            security_issues = risk_data.get('security_issues', [])
+            
+            # Create header
+            if risk_score >= 70:
+                badge = f"## 🔴 Risk Score: {risk_score}/100 ({risk_level})"
+            elif risk_score >= 40:
+                badge = f"## 🟡 Risk Score: {risk_score}/100 ({risk_level})"
+            else:
+                badge = f"## 🟢 Risk Score: {risk_score}/100 ({risk_level})"
+            
+            # Add security issues count if any
+            if security_issues:
+                badge += f"\n⚠️ **{len(security_issues)} security issue(s) detected**"
+            
+            full_review = f"{badge}\n\n---\n\n{review}"
+            return full_review
+            
         except Exception as e:
             print(f"ReviewWriterAgent: LLM failed: {e}")
             return self._generate_fallback_review(file_summaries, risk_data, test_data)
