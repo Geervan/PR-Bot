@@ -66,8 +66,11 @@ class FileSummaryAgent(BaseAgent):
         """Creates a simple summary for small changes without using LLM."""
         summary = f"**{filename}** (+{additions}/-{deletions})"
         
+        # For small changes, include the actual diff so the writer can see it
+        summary += f"\n\nDiff content:\n```\n{patch}\n```"
+        
         if tree_sitter_summary:
-            summary += f"\n{tree_sitter_summary}"
+            summary += f"\n\nContext: {tree_sitter_summary}"
         
         return summary
     
