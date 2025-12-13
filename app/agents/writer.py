@@ -58,20 +58,40 @@ class ReviewWriterAgent(BaseAgent):
 
 ---
 
-Write a review with these sections:
-1. **What This PR Does**: Describe the functionality being added/changed (always include this!)
-2. **Key Changes**: Bullet points of significant changes
-3. **Security Alerts**: If any security issues were found, highlight them prominently with ⚠️
-4. **Concerns**: Only mention actual bugs, security issues, or breaking changes (if none, say "None identified")
-5. **Suggestions**: Only suggest fixes for real problems (if none needed, skip this section)
+
+Act as an advanced code analysis tool. Be direct and factual.
+
+Structure:
+
+### 1. 📝 Summary
+Briefly explain the functional changes in this PR.
+
+### 2. 🚨 Critical Issues
+(Only if applicable)
+- 🔴 **Security**: [Description of vulnerability]
+- 🔴 **Bug**: [Description of bug]
+
+### 3. ⚠️ Improvements
+(Only if meaningful)
+- 🟡 **Code Quality**: [Performance/Reliability issue]
+- 🟡 **Tests**: [Mention if missing for new logic]
+
+### 4. 🛠️ Code Suggestions
+(Use <details> for code blocks)
+<details>
+<summary>Fix for [Issue]</summary>
+
+```language
+[Code]
+```
+</details>
 
 Rules:
-- ALWAYS describe what the code does functionally, even if it has issues
-- Focus ONLY on: bugs, security issues, breaking changes, missing error handling
-- DO NOT comment on: code style, variable naming, formatting, comments, personal preferences
-- Everyone has their own coding style - respect it
-- PRIORITIZE security issues but still explain what the code is trying to do
-- Keep it short - developers are busy"""
+- If no critical issues, state: "✅ **Code looks safe and correct.**"
+- DO NOT complain about style, comments, or naming.
+- Focus strictly on logic, security, and errors.
+- Keep it short.
+"""
         
         try:
             review = await llm_client.generate_content(prompt)
