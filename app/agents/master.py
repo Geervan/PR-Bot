@@ -200,11 +200,12 @@ Generate 1-2 specific, actionable fixes with code examples.
 Format as markdown with code blocks.
 
 Rules:
-- If suggesting tests, ONLY suggest them if they are relevant to the language changed (e.g. don't suggest Python tests for HTML files).
-- If you don't have access to the backend code, DO NOT invent backend logic to test frontend changes.
-- Focus on the code that is visible in the diff.
-- If the change is just docs or HTML text, suppress "Missing Tests" warnings unless there's dynamic logic.
-- If everything looks good, respond with "No fixes needed."
+- ONLY suggest fixes for ACTUAL bugs or ACTUAL security vulnerabilities.
+- Parameterized SQL (?, %s, :param) is SAFE - do NOT suggest changes.
+- Basic validation functions are FINE - do NOT suggest improvements.
+- If suggesting tests, ONLY suggest them if relevant to the language changed.
+- If code is correct and secure, respond with "No fixes needed."
+- DO NOT invent issues or suggest "better" implementations.
 Keep it under 300 words."""
         
         try:

@@ -88,8 +88,13 @@ Briefly explain the functional changes in this PR.
 
 Rules:
 - If no critical issues, state: "✅ **Code looks safe and correct.**"
-- DO NOT complain about style, comments, or naming.
-- Focus strictly on logic, security, and errors.
+- DO NOT complain about style, comments, naming, or code improvements.
+- DO NOT suggest "better" ways to do things unless there's an actual bug/vulnerability.
+- Parameterized SQL queries (using ?, %s, or :param) are SAFE - do NOT flag them as SQL injection.
+- Basic validation functions are fine - do NOT suggest regex improvements.
+- Focus ONLY on: actual bugs, actual security vulnerabilities, breaking changes.
+- If code works correctly and is secure, say so and move on.
+- Do NOT invent issues that don't exist.
 - Keep it short.
 """
         
