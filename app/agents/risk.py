@@ -57,9 +57,16 @@ class RiskAgent(BaseAgent):
                 r'document\.write\s*\([^)]*\+',
             ]),
             'hardcoded_secret': (35, [
-                r'password\s*=\s*["\'][^"\']{8,}["\']',  # password with 8+ chars
+                # Quoted secrets
+                r'password\s*=\s*["\'][^"\']{8,}["\']',
                 r'api[_-]?key\s*=\s*["\'][A-Za-z0-9_\-]{20,}["\']',
                 r'secret[_-]?key\s*=\s*["\'][^"\']+["\']',
+                # Unquoted secrets (env-style)
+                r'[A-Z_]*KEY\s*=\s*[A-Za-z0-9_\-]{20,}',  # ANY_KEY=value (20+ chars)
+                r'[A-Z_]*SECRET\s*=\s*[A-Za-z0-9_\-]{10,}',  # ANY_SECRET=value
+                r'[A-Z_]*TOKEN\s*=\s*[A-Za-z0-9_\-]{20,}',  # ANY_TOKEN=value
+                # Common service names
+                r'(GEMINI|OPENAI|STRIPE|TWILIO|SENDGRID|SLACK|DISCORD)[_-]?(KEY|TOKEN|SECRET)\s*=',
                 r'AWS[_-]?SECRET[_-]?ACCESS[_-]?KEY\s*=',
                 r'PRIVATE[_-]?KEY\s*=',
             ]),
