@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 from app.agents.base import BaseAgent
 import re
 
@@ -22,38 +22,100 @@ class RiskAgent(BaseAgent):
         r'private[_-]?key',
     ]
     
-    # Dangerous code patterns
+    # Security patterns with severity levels (Critical=50, High=35, Medium=20)
     SECURITY_PATTERNS = {
-        'hardcoded_secret': [
-            r'password\s*=\s*["\'][^"\']+["\']',
-            r'api[_-]?key\s*=\s*["\'][^"\']+["\']',
-            r'secret[_-]?key\s*=\s*["\'][^"\']+["\']',
-            r'token\s*=\s*["\'][A-Za-z0-9_\-]{20,}["\']',
-            r'AWS[_-]?SECRET[_-]?ACCESS[_-]?KEY',
-        ],
-        'sql_injection': [
-            r'execute\s*\(\s*["\'].*\%s',
-            r'cursor\.execute\s*\([^,]+\+',
-            r'query\s*=.*\+.*input',
-            r'f["\']SELECT.*\{',
-        ],
-        'command_injection': [
-            r'os\.system\s*\(',
-            r'subprocess\.call\s*\([^,]+shell\s*=\s*True',
-            r'eval\s*\(',
-            r'exec\s*\(',
-        ],
-        'xss_risk': [
-            r'innerHTML\s*=',
-            r'dangerouslySetInnerHTML',
-            r'document\.write\s*\(',
-        ],
-        'insecure_crypto': [
-            r'md5\s*\(',
-            r'sha1\s*\(',
-            r'DES\s*\(',
-            r'random\.random\s*\(\)',  # Not cryptographically secure
-        ],
+        'critical': {
+            'command_injection': (50, [
+                r'eval\s*\([^)]*\+',           # eval with concatenation
+                r'eval\s*\(\s*[a-zA-Z_]',      # eval with variable
+                r'exec\s*\([^)]*\+',           # exec with concatenation
+                r'os\.system\s*\([^)]*\+',     # os.system with concatenation
+                r'subprocess\.call\s*\([^,]+shell\s*=\s*True',
+            ]),
+            'sql_injection': (50, [
+                r'execute\s*\([^,]*\+',        # execute with concatenation
+                r'execute\s*\(.*%s',           # execute with string formatting
+                r'cursor\.execute\s*\([^,]+\+',
+                r'f["\']SELECT.*\{',           # f-string SQL
+                r'f["\']INSERT.*\{',
+                r'f["\']UPDATE.*\{',
+                r'f["\']DELETE.*\{',
+            ]),
+            'path_traversal': (50, [
+                r'open\s*\([^)]*\+',           # open with concatenation
+                r'open\s*\(f["\']',            # open with f-string (user input in path)
+                r'os\.path\.join\s*\([^)]*\+', # path.join with concatenation
+                r'file_path\s*=\s*f["\']',     # file_path from f-string
+                r'with\s+open\s*\(f["\']',     # with open using f-string
+            ]),
+        },
+        'high': {
+            'xss_risk': (35, [
+                r'innerHTML\s*=\s*[^"\']+\+',  # innerHTML with concatenation
+                r'innerHTML\s*=.*\$\{',        # innerHTML with template literal
+                r'dangerouslySetInnerHTML',
+                r'document\.write\s*\([^)]*\+',
+            ]),
+            'hardcoded_secret': (35, [
+                r'password\s*=\s*["\'][^"\']{8,}["\']',  # password with 8+ chars
+                r'api[_-]?key\s*=\s*["\'][A-Za-z0-9_\-]{20,}["\']',
+                r'secret[_-]?key\s*=\s*["\'][^"\']+["\']',
+                r'AWS[_-]?SECRET[_-]?ACCESS[_-]?KEY\s*=',
+                r'PRIVATE[_-]?KEY\s*=',
+            ]),
+            'ssrf': (50, [
+                r'requests\.(get|post|put|delete)\s*\([^)]*\+',  # requests with concat
+                r'requests\.(get|post|put|delete)\s*\(f["\']',   # requests with f-string
+                r'urllib\.request\.urlopen\s*\([^)]*\+',
+                r'httpx\.(get|post)\s*\(f["\']',
+            ]),
+        },
+        'high': {
+            'xss_risk': (35, [
+                r'innerHTML\s*=\s*[^"\']+\+',  # innerHTML with concatenation
+                r'innerHTML\s*=.*\$\{',        # innerHTML with template literal
+                r'dangerouslySetInnerHTML',
+                r'document\.write\s*\([^)]*\+',
+            ]),
+            'hardcoded_secret': (35, [
+                r'password\s*=\s*["\'][^"\']{8,}["\']',  # password with 8+ chars
+                r'api[_-]?key\s*=\s*["\'][A-Za-z0-9_\-]{20,}["\']',
+                r'secret[_-]?key\s*=\s*["\'][^"\']+["\']',
+                r'AWS[_-]?SECRET[_-]?ACCESS[_-]?KEY\s*=',
+                r'PRIVATE[_-]?KEY\s*=',
+            ]),
+            'open_redirect': (35, [
+                r'redirect\s*\([^)]*\+',           # redirect with concatenation
+                r'redirect\s*\(.*request\.',       # redirect with request param
+                r'HttpResponseRedirect\s*\([^)]*\+',
+                r'res\.redirect\s*\([^)]*\+',      # Express.js
+            ]),
+            'template_injection': (35, [
+                r'render_template_string\s*\(',    # Flask SSTI
+                r'Template\s*\([^)]*\+',           # Jinja2 with concat
+                r'\.render\s*\([^)]*\+',           # Generic template render
+            ]),
+        },
+        'medium': {
+            'insecure_crypto': (20, [
+                r'md5\s*\(',
+                r'sha1\s*\(',
+                r'DES\s*\(',
+                r'random\.random\s*\(\)',
+            ]),
+            'insecure_deserialization': (20, [
+                r'pickle\.loads?\s*\(',
+                r'yaml\.load\s*\([^)]*\)',     # yaml.load without safe_load
+            ]),
+            'nosql_injection': (20, [
+                r'\$where\s*:',                # MongoDB $where
+                r'\.find\s*\(\s*\{[^}]*\$',    # MongoDB operators from input
+            ]),
+            'weak_jwt': (20, [
+                r'algorithm\s*=\s*["\']none["\']',   # JWT alg:none
+                r'verify\s*=\s*False',               # JWT verify disabled
+            ]),
+        },
     }
     
     # Known vulnerable/deprecated packages
@@ -123,11 +185,11 @@ class RiskAgent(BaseAgent):
                 score += 30
                 security_issues.append(f"🔴 Sensitive file modified: `{filename}`")
             
-            # 6. Security pattern detection in code
+            # 6. Security pattern detection in code (with severity-based scoring)
             patterns_found = self._check_security_patterns(patch, filename)
-            for issue in patterns_found:
-                score += 20
-                security_issues.append(issue)
+            for issue_score, issue_text in patterns_found:
+                score += issue_score
+                security_issues.append(issue_text)
             
             # 7. Vulnerable package detection
             if filename in ['requirements.txt', 'package.json', 'Pipfile', 'go.mod']:
@@ -172,8 +234,8 @@ class RiskAgent(BaseAgent):
         
         return False
     
-    def _check_security_patterns(self, patch: str, filename: str) -> List[str]:
-        """Scan code for security issues."""
+    def _check_security_patterns(self, patch: str, filename: str) -> List[Tuple[int, str]]:
+        """Scan code for security issues. Returns list of (score, issue_description)."""
         issues = []
         
         if not patch:
@@ -183,18 +245,29 @@ class RiskAgent(BaseAgent):
         added_lines = [line for line in patch.split('\n') if line.startswith('+')]
         added_code = '\n'.join(added_lines)
         
-        for category, patterns in self.SECURITY_PATTERNS.items():
-            for pattern in patterns:
-                if re.search(pattern, added_code, re.IGNORECASE):
-                    issue_names = {
-                        'hardcoded_secret': '🔑 Potential hardcoded secret',
-                        'sql_injection': '💉 Potential SQL injection',
-                        'command_injection': '⚠️ Potential command injection',
-                        'xss_risk': '🌐 Potential XSS vulnerability',
-                        'insecure_crypto': '🔓 Insecure cryptography',
-                    }
-                    issues.append(f"{issue_names.get(category, category)} in `{filename}`")
-                    break  # One per category per file
+        issue_labels = {
+            'command_injection': '🔴 [Critical] Command Injection',
+            'sql_injection': '🔴 [Critical] SQL Injection',
+            'path_traversal': '🔴 [Critical] Path Traversal',
+            'ssrf': '🔴 [Critical] Server-Side Request Forgery (SSRF)',
+            'xss_risk': '🟠 [High] XSS Vulnerability',
+            'hardcoded_secret': '🟠 [High] Hardcoded Secret',
+            'open_redirect': '🟠 [High] Open Redirect',
+            'template_injection': '🟠 [High] Template Injection (SSTI)',
+            'insecure_crypto': '🟡 [Medium] Insecure Cryptography',
+            'insecure_deserialization': '🟡 [Medium] Insecure Deserialization',
+            'nosql_injection': '🟡 [Medium] NoSQL Injection',
+            'weak_jwt': '🟡 [Medium] Weak JWT Configuration',
+        }
+        
+        # Check all severity tiers
+        for severity_tier, categories in self.SECURITY_PATTERNS.items():
+            for category, (score, patterns) in categories.items():
+                for pattern in patterns:
+                    if re.search(pattern, added_code, re.IGNORECASE):
+                        label = issue_labels.get(category, category)
+                        issues.append((score, f"{label} in `{filename}`"))
+                        break  # One per category per file
         
         return issues
     
