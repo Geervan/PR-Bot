@@ -163,16 +163,17 @@ class MasterAgent(BaseAgent):
     
     async def _generate_auto_fix(self, context: Dict[str, Any]) -> Optional[str]:
         """
-        Generates auto-fix suggestions for common issues.
+        Generates auto-fix suggestions for issues detected by scanner.
         Returns markdown with suggested fixes.
         """
         risk_data = context.get("risk_data", {})
         test_data = context.get("test_data", {})
         file_summaries = context.get("file_summary_data", {}).get("file_summaries", [])
         
-        # Only generate fixes for high-risk PRs or missing tests
-        if risk_data.get("score", 0) < 50 and not test_data.get("missing_tests"):
-            return None
+        # ONLY generate fixes if scanner detected actual security issues
+        security_issues = risk_data.get("security_issues", [])
+        if not security_issues:
+            return None  # No issues = no fixes needed
         
         # Get the actual code changes for context
         files_changed = context.get("diff_data", {}).get("files_changed", [])
@@ -186,27 +187,26 @@ class MasterAgent(BaseAgent):
         if not code_snippets:
             return None
         
-        prompt = f"""Based on this PR review, suggest specific code fixes.
+        # Format security issues for prompt
+        security_text = "\n".join([f"- {issue}" for issue in security_issues])
+        
+        prompt = f"""Provide code fixes for the security issues detected by our scanner.
 
 ## Files Changed
 {chr(10).join(code_snippets)}
 
-## Issues Found
-- Risk Level: {risk_data.get('level')}
-- Missing Tests: {test_data.get('missing_tests', False)}
-- Reasons: {', '.join(risk_data.get('reasons', []))}
+## Security Issues Detected by Scanner (ONLY fix these)
+{security_text}
 
-Generate 1-2 specific, actionable fixes with code examples.
-Format as markdown with code blocks.
+Generate specific code fixes for EACH issue listed above.
+Format as markdown with code blocks showing before/after.
 
-Rules:
-- ONLY suggest fixes for ACTUAL bugs or ACTUAL security vulnerabilities.
-- Parameterized SQL (?, %s, :param) is SAFE - do NOT suggest changes.
-- Basic validation functions are FINE - do NOT suggest improvements.
-- If suggesting tests, ONLY suggest them if relevant to the language changed.
-- If code is correct and secure, respond with "No fixes needed."
-- DO NOT invent issues or suggest "better" implementations.
-Keep it under 300 words."""
+IMPORTANT:
+- ONLY provide fixes for the issues listed above.
+- Do NOT suggest other improvements.
+- Do NOT invent new issues.
+- Keep each fix focused and concise.
+"""
         
         try:
             fix_suggestion = await llm_client.generate_content(prompt)

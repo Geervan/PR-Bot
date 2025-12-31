@@ -32,6 +32,10 @@ class ReviewWriterAgent(BaseAgent):
         rag_text = self._format_rag_context(rag_context)
         
         # Build the prompt
+        # Get security issues from RiskAgent (source of truth)
+        security_issues = risk_data.get('security_issues', [])
+        has_security_issues = len(security_issues) > 0
+        
         prompt = f"""You are an expert code reviewer. Write a structured PR review.
 
 ## PR Statistics
@@ -39,12 +43,12 @@ class ReviewWriterAgent(BaseAgent):
 - Total Additions: {diff_data.get('total_additions', 'N/A')}
 - Total Deletions: {diff_data.get('total_deletions', 'N/A')}
 
-## Risk Assessment
+## Risk Assessment (from automated scanner)
 - Risk Level: **{risk_data.get('level', 'Unknown')}** (Score: {risk_data.get('score', 'N/A')}/100)
 - Tests Modified: {test_data.get('tests_modified', False)}
 - Missing Tests: {test_data.get('missing_tests', False)}
 
-## Security Issues Found
+## Security Issues (PRE-DETECTED by scanner - ONLY mention these, do NOT invent others)
 {self._format_security_issues(risk_data)}
 
 ## File Changes
@@ -59,43 +63,36 @@ class ReviewWriterAgent(BaseAgent):
 ---
 
 
-Act as an advanced code analysis tool. Be direct and factual.
+Act as a code review assistant. Your job is to EXPLAIN issues, not FIND them.
+
+IMPORTANT: The security scanner has ALREADY detected issues (listed above). 
+- ONLY discuss issues that appear in "Security Issues (PRE-DETECTED by scanner)" section.
+- Do NOT invent new security issues. The scanner is the source of truth.
+- If the scanner found NO issues, the code is considered safe.
 
 Structure:
 
 ### 1. 📝 Summary
-Briefly explain the functional changes in this PR.
+Briefly explain what this PR does functionally.
 
-### 2. 🚨 Critical Issues
-(Only if applicable)
-- 🔴 **Security**: [Description of vulnerability]
-- 🔴 **Bug**: [Description of bug]
+### 2. 🚨 Security Issues (from scanner)
+- If scanner found issues: Explain each one and why it's dangerous.
+- If scanner found NO issues: State "✅ **No security issues detected.**"
 
-### 3. ⚠️ Improvements
-(Only if meaningful)
-- 🟡 **Code Quality**: [Performance/Reliability issue]
-- 🟡 **Tests**: [Mention if missing for new logic]
+### 3. 💡 Logic Review
+- Only mention ACTUAL bugs (wrong logic, crashes, data loss).
+- Parameterized SQL (?, %s, :param) is SAFE - do NOT flag it.
+- If no bugs found: State "✅ **Code logic looks correct.**"
 
-### 4. 🛠️ Code Suggestions
-(Use <details> for code blocks)
-<details>
-<summary>Fix for [Issue]</summary>
+### 4. 🛠️ Suggestions (only if scanner found issues)
+- Provide fixes ONLY for issues the scanner detected.
+- If no issues: Skip this section entirely.
 
-```language
-[Code]
-```
-</details>
-
-Rules:
-- If no critical issues, state: "✅ **Code looks safe and correct.**"
-- DO NOT complain about style, comments, naming, or code improvements.
-- DO NOT suggest "better" ways to do things unless there's an actual bug/vulnerability.
-- Parameterized SQL queries (using ?, %s, or :param) are SAFE - do NOT flag them as SQL injection.
-- Basic validation functions are fine - do NOT suggest regex improvements.
-- Focus ONLY on: actual bugs, actual security vulnerabilities, breaking changes.
-- If code works correctly and is secure, say so and move on.
-- Do NOT invent issues that don't exist.
-- Keep it short.
+STRICT RULES:
+- Trust the scanner. If it says "No security issues", believe it.
+- Do NOT suggest code improvements or "better" ways.
+- Do NOT flag safe patterns as vulnerabilities.
+- Keep response under 200 words if no issues found.
 """
         
         try:
